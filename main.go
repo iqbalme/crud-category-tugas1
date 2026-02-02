@@ -1,11 +1,19 @@
 package main
 
 import (
+	"crud-kategori/database"
+	"crud-kategori/handlers"
+	"crud-kategori/repositories"
+	"crud-kategori/services"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 // Category represents a product in the cashier system
@@ -13,6 +21,12 @@ type Category struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
+}
+
+// ubah Config
+type Config struct {
+	Port   string `mapstructure:"PORT"`
+	DBConn string `mapstructure:"DB_CONN"`
 }
 
 // In-memory storage (sementara, nanti ganti database)
@@ -112,6 +126,13 @@ func deleteKategori(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	if _, err := os.Stat(".env"); err == nil {
+		viper.SetConfigFile(".env")
+		_ = viper.ReadInConfig()
+	}
 	// localhost:8080/health
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -225,10 +246,27 @@ func main() {
 		}
 	})
 
-	fmt.Println("Server running di localhost:8080")
+	// Setup routes
+	http.HandleFunc("/api/produk", productHandler.HandleProducts)
+	http.HandleFunc("/api/produk/", productHandler.HandleProductByID)
 
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		fmt.Println("gagal running server")
+	config := Config{
+		Port:   viper.GetString("PORT"),
+		DBConn: viper.GetString("DB_CONN"),
 	}
+
+	// Setup database
+	db, err := database.InitDB(config.DBConn)
+	if err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
+	defer db.Close()
+
+	productRepo := repositories.NewProductRepository(db)
+	productService := services.NewProductService(productRepo)
+	productHandler := handlers.NewProductHandler(productService)
+
+	addr := "0.0.0.0:" + config.Port
+	fmt.Println("Server running di", addr)
+
 }
