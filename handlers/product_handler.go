@@ -61,6 +61,16 @@ func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // HandleProductByID - GET/PUT/DELETE /api/produk/{id}
 func (h *ProductHandler) HandleProductByID(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/produk/")
+	if idStr == "" {
+		switch r.Method {
+		case http.MethodGet:
+			h.GetAll(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
 		h.GetByID(w, r)
